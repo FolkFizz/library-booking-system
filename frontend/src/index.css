@@ -1,12 +1,28 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   :root {
     --bg-1: #f6f1e8;
-    --bg-2: #e6eef4;
-    --ink-1: #1f2933;
-    --ink-2: #5c6773;
+    --bg-2: #e3edf4;
+    --ink-1: #0f172a;
+    --ink-2: #475569;
+    --surface: #ffffff;
+    --surface-muted: #f8fafc;
+    --border: #e2e8f0;
+    --shadow: rgba(15, 23, 42, 0.12);
+  }
+
+  .dark {
+    --bg-1: #0b1220;
+    --bg-2: #111827;
+    --ink-1: #f1f5f9;
+    --ink-2: #94a3b8;
+    --surface: #0f172a;
+    --surface-muted: #111827;
+    --border: #1f2937;
+    --shadow: rgba(15, 23, 42, 0.6);
   }
 
   body {
@@ -15,8 +31,15 @@
     color: var(--ink-1);
     background-color: var(--bg-1);
     background-image:
-      radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0)),
-      radial-gradient(circle at 85% 10%, rgba(243, 221, 188, 0.55), rgba(255, 255, 255, 0)),
+      radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0)),
+      radial-gradient(circle at 85% 10%, rgba(243, 221, 188, 0.45), rgba(255, 255, 255, 0)),
+      linear-gradient(135deg, var(--bg-1), var(--bg-2));
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(circle at 12% 18%, rgba(30, 64, 175, 0.25), rgba(15, 23, 42, 0)),
+      radial-gradient(circle at 85% 10%, rgba(15, 118, 110, 0.2), rgba(15, 23, 42, 0)),
       linear-gradient(135deg, var(--bg-1), var(--bg-2));
   }
 

@@ -41,9 +41,9 @@ class RoomResponse(RoomBase):
 
 class BookingBase(BaseModel):
     room_id: int
-    user_id: int
     start_time: datetime
     end_time: datetime
+    attendees_count: int
 
 
 class BookingCreate(BookingBase):
@@ -58,6 +58,8 @@ class BookingUpdate(BaseModel):
 
 class BookingResponse(BookingBase):
     id: int
+    user_id: int
+    room_name: str
     status: str
     created_at: Optional[datetime] = None
 
@@ -66,3 +68,26 @@ class BookingResponse(BookingBase):
     else:  # pragma: no cover - pydantic v1 fallback
         class Config:
             orm_mode = True
+
+
+class UserCreate(BaseModel):
+    name: str
+    email: str
+    password: str
+
+
+class UserResponse(BaseModel):
+    id: int
+    name: str
+    email: str
+
+    if ConfigDict:
+        model_config = ConfigDict(from_attributes=True)
+    else:  # pragma: no cover - pydantic v1 fallback
+        class Config:
+            orm_mode = True
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str

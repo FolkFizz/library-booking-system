@@ -5,6 +5,11 @@ const api = axios.create({
 })
 
 api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('auth-token')
+  if (token) {
+    config.headers = config.headers ?? {}
+    config.headers.Authorization = `Bearer ${token}`
+  }
   if (localStorage.getItem('chaos-mode') === 'true') {
     config.headers = config.headers ?? {}
     config.headers['x-chaos-token'] = 'true'

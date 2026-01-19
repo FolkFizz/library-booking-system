@@ -1,6 +1,6 @@
 from enum import Enum as PyEnum
 
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String, func
 from sqlalchemy.orm import relationship
 
 from database import Base
@@ -21,8 +21,9 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(100), unique=True, nullable=False)
-    password_hash = Column(String(255), nullable=False)
+    name = Column(String(100), nullable=False)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    hashed_password = Column(String(255), nullable=False)
     role = Column(String(50), nullable=False, default="member")
     credit_limit = Column(Integer, nullable=False, default=0)
 
@@ -53,7 +54,20 @@ class Booking(Base):
     room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False)
     start_time = Column(DateTime(timezone=True), nullable=False)
     end_time = Column(DateTime(timezone=True), nullable=False)
+    attendees_count = Column(Integer, nullable=False, default=1)
     status = Column(String(30), nullable=False, default="active")
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=func.now(),
+        server_default=func.now(),
+    )
 
     user = relationship("User", back_populates="bookings")
     room = relationship("Room", back_populates="bookings")
+
+    @property
+    def room_name(self) -> str:
+        if self.room:
+            return self.room.name
+        return ""

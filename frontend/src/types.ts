@@ -15,6 +15,8 @@ export interface Booking {
   user_id: number
   start_time: string
   end_time: string
+  attendees_count: number
+  room_name: string
   status: string
   created_at?: string | null
 }
