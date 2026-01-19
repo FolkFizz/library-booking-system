@@ -5,6 +5,7 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -22,6 +23,13 @@ from schemas import (
 load_dotenv()
 
 app = FastAPI(title="Library Room Booking System")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def _is_chaos_enabled() -> bool:
