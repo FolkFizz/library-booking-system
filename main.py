@@ -30,7 +30,8 @@ def _is_chaos_enabled() -> bool:
 
 @app.middleware("http")
 async def chaos_engineering_middleware(request, call_next):
-    if _is_chaos_enabled() and random.random() < 0.1:
+    header_enabled = request.headers.get("x-chaos-token", "").lower() == "true"
+    if (header_enabled or _is_chaos_enabled()) and random.random() < 0.1:
         if random.choice([True, False]):
             await asyncio.sleep(3)
         else:
