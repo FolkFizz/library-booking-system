@@ -133,5 +133,5 @@ As a QA-focused project, special attention was given to:
 
 ## 👨‍💻 Author
 
-**Folk (FolkFizz)**  
+**Tanakrit Eiadra (Folk)**  
 Aspiring QA Automation Engineer | Tech Enthusiast
