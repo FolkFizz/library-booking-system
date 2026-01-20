@@ -1,9 +1,23 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from enum import Enum as PyEnum
 
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String, func
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
 from database import Base
+
+THAI_TZ = ZoneInfo("Asia/Bangkok")
+
+
+def as_thai_time(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=THAI_TZ)
+    return value.astimezone(THAI_TZ)
+
+
+def now_thai_time() -> datetime:
+    return datetime.now(THAI_TZ)
 
 
 class RoomType(PyEnum):
@@ -59,8 +73,7 @@ class Booking(Base):
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
-        default=func.now(),
-        server_default=func.now(),
+        default=now_thai_time,
     )
 
     user = relationship("User", back_populates="bookings")

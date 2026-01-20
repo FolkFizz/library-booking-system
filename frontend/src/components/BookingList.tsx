@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import axios from 'axios'
-import api from '../lib/api'
+import { api } from '../lib/api'
 import type { Booking } from '../types'
-import { useAuth } from '../context/AuthContext'
+
+const normalizeDateString = (value: string) =>
+  value.replace(/([zZ]|[+-]\d{2}:?\d{2})$/, '')
 
 const formatRange = (start: string, end: string) => {
-  const startDate = new Date(start)
-  const endDate = new Date(end)
+  const startDate = new Date(normalizeDateString(start))
+  const endDate = new Date(normalizeDateString(end))
   if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
     return 'Invalid date range'
   }
@@ -28,20 +30,14 @@ const formatRange = (start: string, end: string) => {
 }
 
 const BookingList = () => {
-  const { userId } = useAuth()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const fetchBookings = useCallback(async () => {
-    if (!userId) {
-      setBookings([])
-      setLoading(false)
-      return
-    }
     setLoading(true)
     try {
-      const response = await api.get<Booking[]>(`/my-bookings/${userId}`)
+      const response = await api.get<Booking[]>('/my-bookings')
       setBookings(response.data)
       setError('')
     } catch (err) {
@@ -53,13 +49,14 @@ const BookingList = () => {
     } finally {
       setLoading(false)
     }
-  }, [userId])
+  }, [])
 
   useEffect(() => {
     fetchBookings()
   }, [fetchBookings])
 
   const handleCancel = async (bookingId: number) => {
+    if (!window.confirm('Are you sure you want to cancel this booking?')) return
     try {
       await api.delete(`/bookings/${bookingId}`)
       await fetchBookings()

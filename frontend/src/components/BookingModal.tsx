@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import axios from 'axios'
-import api from '../lib/api'
+import { api } from '../lib/api'
 import type { Room } from '../types'
 
 type BookingModalProps = {

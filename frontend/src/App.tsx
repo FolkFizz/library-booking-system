@@ -1,12 +1,11 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import api from './lib/api'
+import { api } from './lib/api'
 import RoomCard from './components/RoomCard'
 import BookingModal from './components/BookingModal'
 import Navbar from './components/Navbar'
 import type { Room } from './types'
 import { useTheme } from './context/ThemeContext'
 
-const CHAOS_KEY = 'chaos-mode'
 const PAGE_SIZE = 12
 
 type RoomTab = 'all' | 'A' | 'B' | 'C'
@@ -25,9 +24,6 @@ function App() {
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null)
   const [activeTab, setActiveTab] = useState<RoomTab>('all')
   const [currentPage, setCurrentPage] = useState(1)
-  const [chaosEnabled] = useState(
-    () => localStorage.getItem(CHAOS_KEY) === 'true',
-  )
   const mountedRef = useRef(true)
   const { theme, toggleTheme } = useTheme()
 
@@ -78,12 +74,6 @@ function App() {
     if (currentPage !== safePage) setCurrentPage(safePage)
   }, [currentPage, safePage])
 
-  const toggleChaos = () => {
-    const nextValue = !chaosEnabled
-    localStorage.setItem(CHAOS_KEY, nextValue ? 'true' : 'false')
-    window.location.reload()
-  }
-
   const handleBook = (room: Room) => {
     setSelectedRoom(room)
   }
@@ -97,8 +87,6 @@ function App() {
       <div className="min-h-screen px-6 py-8 page-fade sm:px-10">
         <div className="mx-auto flex max-w-6xl flex-col gap-8">
           <Navbar
-            isChaosMode={chaosEnabled}
-            onToggleChaos={toggleChaos}
             onToggleTheme={toggleTheme}
             theme={theme}
           />
@@ -110,7 +98,6 @@ function App() {
                   ? 'No rooms'
                   : `Showing ${startIndex}-${endIndex} of ${filteredRooms.length}`}
               </span>
-              <span>Updated from http://localhost:8000</span>
             </div>
 
             <div

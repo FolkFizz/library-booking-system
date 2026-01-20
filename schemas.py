@@ -3,12 +3,14 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from models import RoomStatus, RoomType
+from models import RoomStatus, RoomType, as_thai_time
 
 try:
-    from pydantic import ConfigDict
+    from pydantic import ConfigDict, field_validator
 except ImportError:  # pragma: no cover - pydantic v1 fallback
     ConfigDict = None
+    field_validator = None
+    from pydantic import validator
 
 
 class RoomBase(BaseModel):
@@ -68,6 +70,20 @@ class BookingResponse(BookingBase):
     else:  # pragma: no cover - pydantic v1 fallback
         class Config:
             orm_mode = True
+
+    if field_validator:
+        @field_validator('created_at', mode='after')
+        @classmethod
+        def _localize_created_at(cls, value: Optional[datetime]) -> Optional[datetime]:
+            if value is None:
+                return value
+            return as_thai_time(value)
+    else:  # pragma: no cover - pydantic v1 fallback
+        @validator('created_at', pre=False, always=True)
+        def _localize_created_at(cls, value: Optional[datetime]) -> Optional[datetime]:
+            if value is None:
+                return value
+            return as_thai_time(value)
 
 
 class UserCreate(BaseModel):

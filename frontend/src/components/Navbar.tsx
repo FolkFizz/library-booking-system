@@ -1,23 +1,26 @@
-﻿import { Link, useLocation } from 'react-router-dom'
+﻿import type { MouseEvent } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 type NavbarProps = {
-  isChaosMode: boolean
-  onToggleChaos: () => void
   onToggleTheme: () => void
   theme: 'light' | 'dark'
 }
 
-const Navbar = ({
-  isChaosMode,
-  onToggleChaos,
-  onToggleTheme,
-  theme,
-}: NavbarProps) => {
+const Navbar = ({ onToggleTheme, theme }: NavbarProps) => {
   const { logout } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
   const isRooms = location.pathname === '/'
   const isBookings = location.pathname === '/my-bookings'
+  const apiDocsUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/docs`
+
+  const handleLogoutClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    logout()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/80 pb-4 dark:border-slate-700/80">
@@ -64,20 +67,17 @@ const Navbar = ({
         >
           {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
         </button>
-        <button
-          type="button"
-          onClick={onToggleChaos}
-          className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] transition ${
-            isChaosMode
-              ? 'border-amber-500/60 bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-200'
-              : 'border-slate-300 bg-white/70 text-slate-700 hover:border-slate-400 dark:border-slate-600 dark:bg-slate-900/70 dark:text-slate-200'
-          }`}
+        <a
+          href={apiDocsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-full border border-slate-300 bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-slate-700 transition hover:border-slate-400 dark:border-slate-600 dark:bg-slate-900/70 dark:text-slate-200"
         >
-          Chaos Mode
-        </button>
+          API Documentation
+        </a>
         <button
           type="button"
-          onClick={logout}
+          onClick={handleLogoutClick}
           className="rounded-full border border-slate-300 bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-slate-700 transition hover:border-slate-400 dark:border-slate-600 dark:bg-slate-900/70 dark:text-slate-200"
         >
           Logout

@@ -11,7 +11,6 @@ from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session, joinedload
 
 from database import SessionLocal, engine
@@ -122,6 +121,14 @@ def _validate_attendees(room: models.Room, attendees_count: int) -> None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail='Type C rooms require 6-10 people.',
         )
+
+
+def _localize_booking_response(
+    response: schemas.BookingResponse,
+) -> schemas.BookingResponse:
+    response.start_time = models.as_thai_time(response.start_time)
+    response.end_time = models.as_thai_time(response.end_time)
+    return response
 
 
 def _ensure_no_overlap(
@@ -263,8 +270,8 @@ def room_availability(
             status_code=status.HTTP_404_NOT_FOUND, detail='Room not found.'
         )
 
-    day_start = datetime.combine(date, time.min)
-    day_end = datetime.combine(date, time.max)
+    day_start = datetime.combine(date, time.min).replace(tzinfo=models.THAI_TZ)
+    day_end = datetime.combine(date, time.max).replace(tzinfo=models.THAI_TZ)
 
     bookings = (
         db.query(models.Booking)
@@ -280,8 +287,10 @@ def room_availability(
 
     ranges = []
     for booking in bookings:
-        start_time = max(booking.start_time, day_start)
-        end_time = min(booking.end_time, day_end)
+        start_time = models.as_thai_time(booking.start_time)
+        end_time = models.as_thai_time(booking.end_time)
+        start_time = max(start_time, day_start)
+        end_time = min(end_time, day_end)
         ranges.append(
             {
                 'start': start_time.strftime('%H:%M'),
@@ -298,91 +307,116 @@ def create_booking(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    _validate_booking_times(booking_in.start_time, booking_in.end_time)
-    _validate_booking_duration(booking_in.start_time, booking_in.end_time)
-
-    booking_data = _model_to_dict(booking_in)
-    booking_data.pop('created_at', None)
-    booking: Optional[models.Booking] = None
-
     try:
-        with db.begin():
-            room = (
-                db.query(models.Room)
-                .filter(models.Room.id == booking_in.room_id)
-                .with_for_update()
-                .first()
+        # 1. Validate: Time Logic
+        start_time = models.as_thai_time(booking_in.start_time)
+        end_time = models.as_thai_time(booking_in.end_time)
+        start_clock = start_time.timetz().replace(tzinfo=None)
+        end_clock = end_time.timetz().replace(tzinfo=None)
+        opening_time = time(8, 0)
+        closing_time = time(20, 0)
+        if start_clock < opening_time or end_clock > closing_time:
+            raise HTTPException(
+                status_code=400,
+                detail="Bookings are only allowed between 08:00 and 20:00.",
             )
-            if not room:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, detail='Room not found.'
-                )
+        if start_time >= end_time:
+            raise HTTPException(status_code=400, detail="Start time must be before end time")
+        
+        # Check 4-hour limit
+        duration = (end_time - start_time).total_seconds() / 3600
+        if duration > 4:
+            raise HTTPException(status_code=400, detail="Booking cannot exceed 4 hours")
 
-            _validate_attendees(room, booking_in.attendees_count)
-            _ensure_no_overlap(
-                db,
-                booking_in.room_id,
-                booking_in.start_time,
-                booking_in.end_time,
-                status_code=status.HTTP_409_CONFLICT,
-            )
+        if booking_in.attendees_count <= 0:
+             raise HTTPException(status_code=400, detail="attendees_count must be greater than 0")
 
-            booking = models.Booking(**booking_data, user_id=current_user.id)
-            db.add(booking)
-            db.flush()
-            db.refresh(booking)
-    except OperationalError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail='Room is being booked by another request. Please retry.',
-        ) from exc
-    except IntegrityError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail='Invalid booking data.',
-        ) from exc
+        # 2. Validate: Room & Capacity
+        room = db.query(models.Room).filter(models.Room.id == booking_in.room_id).first()
+        if not room:
+            raise HTTPException(status_code=404, detail="Room not found")
+        
+        # Capacity Logic
+        if room.type == "A" and booking_in.attendees_count != 1:
+            raise HTTPException(status_code=400, detail="Room Type A allows exactly 1 person")
+        if room.type == "B" and not (2 <= booking_in.attendees_count <= 5):
+            raise HTTPException(status_code=400, detail="Room Type B allows 2-5 people")
+        if room.type == "C" and not (6 <= booking_in.attendees_count <= 10):
+            raise HTTPException(status_code=400, detail="Room Type C allows 6-10 people")
 
-    if not booking or booking.id is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail='Booking could not be created.',
+        # 3. Check Overlap (Simple Check without Lock to prevent 500 Error)
+        overlap = db.query(models.Booking).filter(
+            models.Booking.room_id == booking_in.room_id,
+            models.Booking.status == "active",
+            models.Booking.end_time > start_time,
+            models.Booking.start_time < end_time
+        ).first()
+
+        if overlap:
+            raise HTTPException(status_code=409, detail="Room is already booked for this time")
+
+        # 4. Create Booking
+        booking = models.Booking(
+            room_id=booking_in.room_id,
+            user_id=current_user.id,
+            start_time=start_time,
+            end_time=end_time,
+            attendees_count=booking_in.attendees_count,
+            status="active",
+            created_at=models.now_thai_time()
         )
+        
+        db.add(booking)
+        db.commit()             # <--- Commit ทีเดียวจบ
+        db.refresh(booking)     # <--- ดึงข้อมูลล่าสุด (ID, created_at) กลับมา
+        
+        # 5. Prepare Response
+        # ใส่ room_name กลับไปให้ Frontend (ถ้า Schema รองรับ)
+        response = schemas.BookingResponse.model_validate(booking)
+        response = _localize_booking_response(response)
+        if hasattr(response, 'room_name'):
+            response.room_name = room.name
+            
+        return response
 
-    booking = (
-        db.query(models.Booking)
-        .options(joinedload(models.Booking.room))
-        .filter(models.Booking.id == booking.id)
-        .first()
-    )
-    if not booking:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail='Booking could not be created.',
-        )
-    if booking.created_at is None:
-        booking.created_at = datetime.utcnow()
-    return booking
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        db.rollback() # ถ้าพัง ให้ย้อนกลับ
+        print(f"ERROR: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get('/my-bookings/{user_id}', response_model=list[schemas.BookingResponse])
+@app.get('/my-bookings', response_model=list[schemas.BookingResponse])
 def list_my_bookings(
-    user_id: int,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    if user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail='Not authorized to view these bookings.',
-        )
-
-    return (
+    # ดึงข้อมูลการจองของ "ฉัน" (คนที่ถือ Token) โดยไม่ต้องส่ง user_id มา
+    bookings = (
         db.query(models.Booking)
-        .options(joinedload(models.Booking.room))
+        .options(joinedload(models.Booking.room)) # Join ตาราง Room มาด้วย
         .filter(models.Booking.user_id == current_user.id)
         .order_by(models.Booking.start_time.desc())
         .all()
     )
+
+    # แปลงข้อมูลเพื่อเติม room_name ให้ Frontend
+    results = []
+    for b in bookings:
+        # ใช้ model_validate (สำหรับ Pydantic v2) หรือ from_orm (v1)
+        b_resp = schemas.BookingResponse.model_validate(b)
+        b_resp = _localize_booking_response(b_resp)
+        
+        # ดึงชื่อห้องจาก Relation ที่ Join มา
+        if b.room:
+            b_resp.room_name = b.room.name
+        else:
+            b_resp.room_name = "Unknown"
+            
+        results.append(b_resp)
+
+    return results
 
 
 @app.delete('/bookings/{booking_id}', status_code=status.HTTP_204_NO_CONTENT)

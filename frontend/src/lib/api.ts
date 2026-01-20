@@ -1,7 +1,9 @@
 import axios from 'axios'
 
-const api = axios.create({
-  baseURL: 'http://localhost:8000',
+const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+export const api = axios.create({
+  baseURL,
 })
 
 api.interceptors.request.use((config) => {
@@ -10,11 +12,5 @@ api.interceptors.request.use((config) => {
     config.headers = config.headers ?? {}
     config.headers.Authorization = `Bearer ${token}`
   }
-  if (localStorage.getItem('chaos-mode') === 'true') {
-    config.headers = config.headers ?? {}
-    config.headers['x-chaos-token'] = 'true'
-  }
   return config
 })
-
-export default api
